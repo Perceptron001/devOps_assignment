@@ -1,0 +1,121 @@
+Parameters:
+  VpcName:
+    Type: String
+    Description: Name of the VPC
+  VpcCIDR:
+    Type: String
+    Description: CIDR block for the VPC
+  PublicSubnet1CIDR:
+    Type: String
+    Description: CIDR block for Public Subnet 1
+  PublicSubnet2CIDR:
+    Type: String
+    Description: CIDR block for Public Subnet 2
+  PrivateSubnet1CIDR:
+    Type: String
+    Description: CIDR block for Private Subnet 1
+  PrivateSubnet2CIDR:
+    Type: String
+    Description: CIDR block for Private Subnet 2
+
+Resources:
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref VpcName
+
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs '']
+
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [0, !GetAZs '']
+
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [1, !GetAZs '']
+
+
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where VPN client will be deployed
+
+Resources:
+  VPNClient:
+    Type: 'AWS::EC2::ClientVpnEndpoint'
+    Properties:
+      VpcId: !Ref VpcId
+      ConnectionLogOptions:
+        Enabled: true
+        CloudwatchLogGroup: /aws/vpn-logs
+      AuthenticationOptions:
+        - Type: certificate-authentication
+          MutualAuthentication:
+            ClientRootCertificateChainArn: YOUR_CLIENT_CERTIFICATE_ARN
+      ClientCidrBlock: 10.0.0.0/16
+
+
+
+
+Parameters:
+  DBName:
+    Type: String
+    Description: Name of the database
+  MasterUsername:
+    Type: String
+    Description: Username for the database
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+    Description: Password for the database
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where RDS will be deployed
+  SubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+Resources:
+  RDSDatabase:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBName: !Ref DBName
+      AllocatedStorage: 20
+      DBInstanceIdentifier: MyDBInstance
+      Engine: aurora
+      EngineMode: serverless
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      DBSubnetGroupName: !Ref SubnetGroup
+      VPCSecurityGroups:
+        - sg-0123456789abcdef0  # Replace with your security group ID
